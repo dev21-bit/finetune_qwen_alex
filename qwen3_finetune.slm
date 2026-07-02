@@ -1,0 +1,34 @@
+#!/bin/bash
+#SBATCH --job-name=qwen3_qml_finetune
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=12
+#SBATCH --gpus=2
+#SBATCH --mem=128G
+#SBATCH --time=12:00:00
+#SBATCH --output=qwen3_finetune_%j.out
+#SBATCH --error=qwen3_finetune_%j.err
+
+cd $SLURM_SUBMIT_DIR
+
+# Cargar módulos
+module purge
+module load anaconda/anaconda3
+source /lusitania_apps/anaconda3/anaconda_init
+conda activate qwen_qml
+
+# Configurar ambas GPUs
+export CUDA_VISIBLE_DEVICES=0,1
+export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+
+echo "========================================="
+echo "Fine-tuning Qwen3-32B con 2 GPUs"
+echo "========================================="
+echo "GPUs: $(nvidia-smi --query-gpu=name --format=csv,noheader | tr '\n' ' ')"
+echo "========================================="
+
+# Ejecutar
+python qwen3_finetune_dual_gpu.py
+
+echo "Fine-tuning completado"
