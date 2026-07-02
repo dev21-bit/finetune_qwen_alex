@@ -9,51 +9,108 @@
 #SBATCH --time=12:00:00
 #SBATCH --output=qwen3_finetune_%j.out
 #SBATCH --error=qwen3_finetune_%j.err
-#SBATCH --mail-type=ALL                                      
-#SBATCH --mail-user=amontesdev21@gmail.com         
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=amontesdev21@gmail.com
 
-cd $SLURM_SUBMIT_DIR
+set -euo pipefail
 
-# Cargar módulos
+cd "$SLURM_SUBMIT_DIR"
+
+#########################################
+# Cargar entorno
+#########################################
+
 module purge
 module load anaconda/anaconda3
 source /lusitania_apps/anaconda3/anaconda_init
 conda activate qwen_qml
 
-# Configurar ambas GPUs
+#########################################
+# CUDA
+#########################################
+
 export CUDA_VISIBLE_DEVICES=0,1
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
 
-# Mostrar información del sistema
+#########################################
+# Información
+#########################################
+
 echo "========================================="
-echo "Fine-tuning Qwen3-32B con 2 GPUs"
+echo "Fine-tuning Qwen3-32B"
 echo "========================================="
-echo "Fecha: $(date)"
-echo "Nodo: $(hostname)"
-echo "SLURM_JOB_ID: $SLURM_JOB_ID"
-echo "GPUs: $(nvidia-smi --query-gpu=name --format=csv,noheader | tr '\n' ' ')"
-echo "Python: $(which python)"
-echo "PyTorch: $(python -c 'import torch; print(torch.__version__)')"
+echo "Fecha      : $(date)"
+echo "Nodo       : $(hostname)"
+echo "Job ID     : $SLURM_JOB_ID"
+echo "Directorio : $(pwd)"
+echo "Python     : $(which python)"
 echo "========================================="
 
-# Verificar que el script existe
-if [ ! -f "qwen3_finetune_dual_gpu.py" ]; then
-    echo "Error: No se encuentra qwen3_finetune_dual_gpu.py"
+nvidia-smi
+
+python <<EOF
+import torch
+
+print("="*50)
+print("PyTorch:", torch.__version__)
+print("CUDA disponible:", torch.cuda.is_available())
+print("Número GPUs:", torch.cuda.device_count())
+
+for i in range(torch.cuda.device_count()):
+    print(i, torch.cuda.get_device_name(i))
+print("="*50)
+EOF
+
+#########################################
+# Script
+#########################################
+
+SCRIPT="qwen3_finetune_dual_gpu.py"
+
+if [ ! -f "$SCRIPT" ]; then
+    echo "ERROR: No existe $SCRIPT"
     exit 1
 fi
 
-# Verificar que el modelo existe
-if [ ! -d "/home/jesus.amontes/models/Qwen3-32B" ]; then
-    echo "Modelo no encontrado en /home/jesus.amontes/models/Qwen3-32B"
-    echo "Intentando continuar..."
+#########################################
+# Modelo
+#########################################
+
+MODEL_DIR="/home/jesus.amontes/models/Qwen3-32B"
+
+if [ ! -d "$MODEL_DIR" ]; then
+    echo "========================================="
+    echo "ERROR:"
+    echo "No existe el modelo:"
+    echo "$MODEL_DIR"
+    echo "========================================="
+    exit 1
 fi
 
-# Ejecutar
-echo "Iniciando fine-tuning..."
-python qwen3_finetune_dual_gpu.py
+#########################################
+# Entrenamiento
+#########################################
 
-# Finalizar
+echo ""
 echo "========================================="
-echo "Fine-tuning completado"
-echo "Fecha: $(date)"
+echo "Iniciando entrenamiento..."
 echo "========================================="
+
+python -u "$SCRIPT"
+
+EXIT_CODE=$?
+
+echo ""
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "========================================="
+    echo "Entrenamiento finalizado correctamente."
+    echo "Fecha: $(date)"
+    echo "========================================="
+else
+    echo "========================================="
+    echo "ERROR durante el entrenamiento."
+    echo "Código de salida: $EXIT_CODE"
+    echo "========================================="
+    exit $EXIT_CODE
+fi
