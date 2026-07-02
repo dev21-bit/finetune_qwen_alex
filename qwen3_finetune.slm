@@ -9,6 +9,8 @@
 #SBATCH --time=12:00:00
 #SBATCH --output=qwen3_finetune_%j.out
 #SBATCH --error=qwen3_finetune_%j.err
+#SBATCH --mail-type=ALL                                      
+#SBATCH --mail-user=amontesdev21@gmail.com         
 
 cd $SLURM_SUBMIT_DIR
 
@@ -22,13 +24,36 @@ conda activate qwen_qml
 export CUDA_VISIBLE_DEVICES=0,1
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
 
+# Mostrar información del sistema
 echo "========================================="
 echo "Fine-tuning Qwen3-32B con 2 GPUs"
 echo "========================================="
+echo "Fecha: $(date)"
+echo "Nodo: $(hostname)"
+echo "SLURM_JOB_ID: $SLURM_JOB_ID"
 echo "GPUs: $(nvidia-smi --query-gpu=name --format=csv,noheader | tr '\n' ' ')"
+echo "Python: $(which python)"
+echo "PyTorch: $(python -c 'import torch; print(torch.__version__)')"
 echo "========================================="
 
+# Verificar que el script existe
+if [ ! -f "qwen3_finetune_dual_gpu.py" ]; then
+    echo "Error: No se encuentra qwen3_finetune_dual_gpu.py"
+    exit 1
+fi
+
+# Verificar que el modelo existe
+if [ ! -d "/home/jesus.amontes/models/Qwen3-32B" ]; then
+    echo "Modelo no encontrado en /home/jesus.amontes/models/Qwen3-32B"
+    echo "Intentando continuar..."
+fi
+
 # Ejecutar
+echo "Iniciando fine-tuning..."
 python qwen3_finetune_dual_gpu.py
 
+# Finalizar
+echo "========================================="
 echo "Fine-tuning completado"
+echo "Fecha: $(date)"
+echo "========================================="
