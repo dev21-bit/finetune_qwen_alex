@@ -1,0 +1,6 @@
+arxiv
+beautifulsoup4
+requests
+feedparser
+tqdm
+pandas
